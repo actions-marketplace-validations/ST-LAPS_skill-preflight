@@ -54,9 +54,10 @@ export function checkSkill(file, root) {
   let fence = null, frontEnd = front ? front[0].split('\n').length - 1 : 0;
   let requirements = '', collecting = false, headingDepth = 0;
   const commands = [];
+  let inComment = false;
   for (let i = frontEnd; i < lines.length; i++) {
-    const line = lines[i];
-    const marker = line.match(/^\s{0,3}(`{3,}|~{3,})(.*)$/);
+    let line = lines[i];
+    const marker = inComment ? null : line.match(/^\s{0,3}(`{3,}|~{3,})(.*)$/);
     if (marker) {
       if (!fence) fence = { char: marker[1][0], size: marker[1].length, language: marker[2].trim().toLowerCase() };
       else if (marker[1][0] === fence.char && marker[1].length >= fence.size && !marker[2].trim()) fence = null;
@@ -66,6 +67,18 @@ export function checkSkill(file, root) {
       if (['sh','shell','bash','console','powershell','pwsh','bat','cmd',''].includes(fence.language)) commands.push({ line: i+1, text: line.trim(), language: fence.language });
       continue;
     }
+    // Ignore HTML comments in Markdown prose while preserving source line numbers.
+    if (inComment) {
+      const end = line.indexOf('-->');
+      if (end === -1) continue;
+      line = line.slice(end + 3);
+      inComment = false;
+    }
+    line = line.replace(/`[^`]*`|<!--.*?(?:-->|$)/g, token => {
+      if (token.startsWith('`')) return token;
+      inComment = !token.endsWith('-->');
+      return ' ';
+    });
     const heading = line.match(/^(#{1,6})\s+(.+?)\s*#*$/);
     if (heading) {
       if (collecting && heading[1].length <= headingDepth) collecting = false;

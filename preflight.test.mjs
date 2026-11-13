@@ -160,3 +160,26 @@ test('Prompt prose and expected-output logs do not become shell portability find
   assert.equal(r.warnings,0);
   assert.equal(scan(fixture(t,header+'```sh\npython3 /tmp/work.py\nexport OUT=/tmp/out\n```')).findings.filter(f=>f.rule==='PORTABILITY_SHELL').length,2);
 });
+
+test('HTML comments hide links without hiding visible links or code fences', t => {
+  const root = fixture(t, header + [
+    '<!-- [hidden](hidden-inline.md) --> [visible](missing-first.md)',
+    '<!--',
+    '```md',
+    '[hidden](hidden-block.md)',
+    '--> [visible](missing-second.md)',
+    '`<!--` [visible](missing-third.md)',
+    '```md',
+    '<!--',
+    '```',
+    '[visible](missing-fourth.md)',
+    '<!-- [hidden](hidden-unclosed.md)',
+  ].join('\n'));
+  const report = scan(root);
+  assert.deepEqual(report.findings.map(({ rule, line, details }) => [rule, line, details.link]), [
+    ['LINK_MISSING', 5, 'missing-first.md'],
+    ['LINK_MISSING', 9, 'missing-second.md'],
+    ['LINK_MISSING', 10, 'missing-third.md'],
+    ['LINK_MISSING', 14, 'missing-fourth.md'],
+  ]);
+});
